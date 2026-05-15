@@ -1,0 +1,65 @@
+# 瑾岚阁 Agent 统一定义 — routing.py 和 acl.py 的共同数据源
+# 每个 agent 定义其角色、权限、能力和抽屉
+
+agents:
+  main:
+    role: dispatcher
+    capabilities: [route, dispatch]
+    drawer: main_inbox
+  qinglong:
+    role: processor
+    capabilities: [process, transform]
+    drawer: qinglong_queue
+  baihu:
+    role: executor
+    capabilities: [execute, manage]
+    drawer: baihu_tasks
+  baihu-qian:
+    role: guard
+    capabilities: [execute, report]
+    drawer: baihu_qian_tasks
+  baihu-kun:
+    role: guard
+    capabilities: [execute, report]
+    drawer: baihu_kun_tasks
+  baihu-zhen:
+    role: guard
+    capabilities: [execute, report]
+    drawer: baihu_zhen_tasks
+  baihu_guard:
+    role: guard
+    capabilities: [verify, protect]
+    drawer: baihu_guard_check
+  yinsi:
+    role: judge
+    capabilities: [judge, evaluate]
+    drawer: yinsi_court
+  yangsi:
+    role: judge
+    capabilities: [judge, reward]
+    drawer: yangsi_court
+  xuanwu:
+    role: coach
+    capabilities: [coach, improve]
+    drawer: xuanwu_lessons
+  zhuque:
+    role: observer
+    capabilities: [search, report]
+    drawer: zhuque_reports
+  fuxi:
+    role: admin
+    capabilities: [speak, notify, report, write]
+    drawer: fuxi_outbox
+
+# 角色对应的权限集合（用于 ACL 模块）
+roles:
+  admin: [read, write, delete, admin, engine_control, agent_impersonate]
+  editor: [read, write]
+  viewer: [read]
+  observer: [read]
+  dispatcher: [read]
+  coach: [read, write]
+  judge: [read, write, delete]
+  executor: [read, write]
+  guard: [read, write]
+  processor: [read, write]

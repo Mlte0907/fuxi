@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FuXi v1.0 — 伏羲记忆引擎</title>
+<style>
+:root {
+  --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a;
+  --text: #e1e4ed; --muted: #8b8fa3; --accent: #6c8fff;
+  --green: #4ade80; --yellow: #facc15; --red: #f87171; --purple: #a78bfa; --cyan: #22d3ee; --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 18px; font-weight: 600; }
+header span { color: var(--muted); font-size: 12px; }
+main { max-width: 1300px; margin: 0 auto; padding: 20px; }
+
+/* Tabs */
+.tabs-nav { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+.tab-btn { padding: 8px 20px; cursor: pointer; border: none; background: none; color: var(--muted); font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-size: 28px; font-weight: 700; margin-top: 2px; }
+.stat-card .sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+
+/* Panels */
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .panels { grid-template-columns: 1fr; } }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.panel-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+.panel-body { padding: 14px 16px; max-height: 500px; overflow-y: auto; }
+
+/* Search */
+.search-bar { display: flex; gap: 8px; margin-bottom: 20px; }
+.search-bar input { flex: 1; padding: 10px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--text); font-size: 14px; }
+.search-bar input:focus { outline: none; border-color: var(--accent); }
+.search-bar button { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; }
+.search-bar button:hover { opacity: 0.9; }
+.search-filters { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.search-filters select, .search-filters input { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); font-size: 13px; }
+
+/* Items */
+.item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.item:last-child { border-bottom: none; }
+.item .text { font-size: 14px; line-height: 1.5; margin-bottom: 4px; }
+.item .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.tag { background: #2a2d3a; color: var(--accent); padding: 1px 7px; border-radius: 4px; font-size: 10px; }
+.hl { background: rgba(108,143,255,0.3); border-radius: 2px; }
+
+/* Engine */
+.engine-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.engine-row:last-child { border-bottom: none; }
+.engine-name { font-size: 13px; font-weight: 500; }
+.engine-interval { font-size: 11px; color: var(--muted); }
+.engine-actions { display: flex; gap: 4px; }
+.btn-sm { padding: 3px 10px; border-radius: 5px; cursor: pointer; font-size: 11px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.btn-sm.run { border-color: var(--green); color: var(--green); }
+.btn-sm.run:hover { background: var(--green); color: #000; }
+.btn-sm.stop { border-color: var(--red); color: var(--red); }
+.btn-sm.stop:hover { background: var(--red); color: #fff; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.status-dot.running { background: var(--green); }
+.status-dot.stopped { background: var(--red); }
+
+/* Graph canvas */
+#graph-canvas { width: 100%; height: 400px; border-radius: var(--radius); cursor: grab; }
+#graph-canvas:active { cursor: grabbing; }
+
+/* Timeline */
+.timeline-item { padding: 10px 0 10px 18px; border-left: 2px solid var(--border); margin-left: 10px; position: relative; }
+.timeline-item::before { content: ''; position: absolute; left: -6px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.timeline-item .ts { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+
+footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 30px; }
+.loading { text-align: center; color: var(--muted); padding: 20px; }
+.error-msg { color: var(--red); padding: 10px; font-size: 13px; }
+.empty { text-align: center; color: var(--muted); padding: 30px; }
+.exp-card { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+.exp-card .exp-type { font-size: 11px; color: var(--accent); }
+.exp-card .exp-desc { font-size: 13px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>伏羲 FuXi</h1>
+  <span>v1.0</span>
+  <input type="password" id="api-key-input" placeholder="API Key" style="margin-left:8px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:170px;" onchange="saveApiKey(this.value)">
+  <span id="health-badge" style="margin-left:auto;font-size:12px;"></span>
+</header>
+
+<main>
+  <!-- Tab Navigation -->
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('overview')">概览</button>
+    <button class="tab-btn" onclick="switchTab('search')">搜索</button>
+    <button class="tab-btn" onclick="switchTab('timeline')">时间线</button>
+    <button class="tab-btn" onclick="switchTab('graph')">图谱</button>
+    <button class="tab-btn" onclick="switchTab('engines')">引擎</button>
+    <button class="tab-btn" onclick="switchTab('experiences')">经验银行</button>
+    <button class="tab-btn" onclick="switchTab('routes')">路由</button>
+    <button class="tab-btn" onclick="switchTab('profile')">档案</button>
+  </div>
+
+  <!-- Tab: Overview -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="stats" id="stats-row"></div>
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header">最近记忆 <button onclick="refreshRecent()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+        <div class="panel-body" id="recent-list"><div class="loading">加载中...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">引擎状态摘要 <button onclick="refreshEngineSummary()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+        <div class="panel-body" id="engine-summary"><div class="loading">加载中...</div></div>
+      </div>
+    </div>
+    <div class="panels" style="margin-top: 16px;">
+      <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel-header">任务状态跟踪 <button onclick="refreshTasks()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+        <div class="panel-body" id="task-panel">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Search -->
+  <div class="tab-content" id="tab-search">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="关键词搜索 + 自然语言查询..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()">搜索</button>
+    </div>
+    <div class="search-filters">
+      <select id="filter-drawer"><option value="">全部抽屉</option></select>
+      <input type="number" id="filter-limit" value="20" min="1" max="100" style="width:70px" title="条数">
+      <input type="number" id="filter-score" value="0" min="0" max="1" step="0.1" style="width:70px" title="最低分数">
+    </div>
+    <div id="search-results"><div class="empty">输入关键词开始搜索</div></div>
+  </div>
+
+  <!-- Tab: Timeline -->
+  <div class="tab-content" id="tab-timeline">
+    <div class="search-filters" style="margin-bottom:16px;">
+      <select id="tl-drawer"><option value="">全部抽屉</option></select>
+      <input type="number" id="tl-limit" value="50" min="1" max="200" style="width:70px" title="条数">
+      <button class="btn-sm" style="color:var(--accent);" onclick="loadTimeline()">加载</button>
+    </div>
+    <div id="timeline-container"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- Tab: Graph -->
+  <div class="tab-content" id="tab-graph">
+    <div class="search-filters" style="margin-bottom:12px;">
+      <select id="graph-drawer"><option value="">全部抽屉</option></select>
+      <input type="number" id="graph-limit" value="30" min="5" max="100" style="width:70px" title="节点数">
+      <button class="btn-sm" style="color:var(--accent);" onclick="loadGraph()">加载图谱</button>
+      <span style="font-size:11px;color:var(--muted);">拖拽画布移动视角</span>
+    </div>
+    <canvas id="graph-canvas"></canvas>
+    <div id="graph-legend" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
+  </div>
+
+  <!-- Tab: Engines -->
+  <div class="tab-content" id="tab-engines">
+    <div class="panel">
+      <div class="panel-header">引擎控制 <button onclick="refreshEngines()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+      <div class="panel-body" id="engine-list"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+
+  <!-- Tab: Experiences -->
+  <div class="tab-content" id="tab-experiences">
+    <div class="search-filters" style="margin-bottom:16px;">
+      <select id="exp-type"><option value="">全部类型</option><option value="distillation">distillation</option></select>
+      <input type="number" id="exp-limit" value="30" min="1" max="100" style="width:70px">
+      <button class="btn-sm" style="color:var(--accent);" onclick="loadExperiences()">加载</button>
+    </div>
+    <div id="experiences-container"><div class="loading">加载中...</div></div>
+  </div>
+
+  <!-- Tab: Model Routes -->
+  <div class="tab-content" id="tab-routes">
+    <div style="background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--muted);">
+      <b style="color:var(--accent);">使用说明</b><br>
+      路由规则决定不同任务类型使用哪个 LLM 模型。匹配规则：按<b>优先级从高到低</b>，第一个 (任务类型 + Agent) 都匹配的规则生效。<br>
+      <b>示例：</b>假设你接入了 DeepSeek-R1 模型，想让「青龙」的规划任务使用它：<br>
+      &nbsp;&nbsp;规则ID: <code>qinglong-r1</code> | 名称: <code>青龙R1推理</code> | 任务类型: <code>planning,reasoning,analysis</code> | Agent: <code>qinglong</code> | 模型: <code>deepseek/deepseek-r1</code> | 优先级: <code>20</code><br>
+      优先级设为 20 会覆盖默认的 MiniMax 路由（优先级 10）。当前所有规则均指向 <code>minimax/MiniMax-M2.7</code>（唯一可用模型）。
+    </div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-header">模型路由规则 <button onclick="refreshRoutes()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+      <div class="panel-body" id="routes-panel"><div class="loading">加载中...</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">添加规则</div>
+      <div class="panel-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div><label style="font-size:11px;color:var(--muted);">规则ID</label><br><input id="new-rule-id" placeholder="my-rule" style="width:120px"></div>
+          <div><label style="font-size:11px;color:var(--muted);">名称</label><br><input id="new-rule-name" placeholder="规则名" style="width:120px"></div>
+          <div><label style="font-size:11px;color:var(--muted);">任务类型(逗号分隔)</label><br><input id="new-rule-tasks" value="*" style="width:200px"></div>
+          <div><label style="font-size:11px;color:var(--muted);">Agent(逗号分隔)</label><br><input id="new-rule-agents" value="*" style="width:120px"></div>
+          <div><label style="font-size:11px;color:var(--muted);">模型</label><br><input id="new-rule-model" value="minimax/MiniMax-M2.7" style="width:200px"></div>
+          <div><label style="font-size:11px;color:var(--muted);">优先级</label><br><input id="new-rule-priority" value="0" type="number" style="width:60px"></div>
+          <button onclick="addRoute()" class="btn-sm" style="color:var(--accent);height:28px;">添加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Profile -->
+  <div class="tab-content" id="tab-profile">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header">用户偏好 <button onclick="refreshProfile()" class="btn-sm" style="color:var(--accent);">刷新</button></div>
+        <div class="panel-body" id="profile-prefs"><div class="loading">加载中...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">习惯 & 禁忌</div>
+        <div class="panel-body" id="profile-habits"><div class="loading">加载中...</div></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <div class="panel-header">更新档案</div>
+      <div class="panel-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div><label style="font-size:11px;color:var(--muted);">偏好 (JSON)</label><br><textarea id="edit-prefs" style="width:300px;height:60px;">{"reply_style":"concise","preferred_language":"zh"}</textarea></div>
+          <div><label style="font-size:11px;color:var(--muted);">习惯 (JSON数组)</label><br><textarea id="edit-habits" style="width:300px;height:60px;">["morning_check","daily_summary"]</textarea></div>
+          <div><label style="font-size:11px;color:var(--muted);">禁忌 (JSON数组)</label><br><textarea id="edit-taboos" style="width:300px;height:60px;">[]</textarea></div>
+          <button onclick="saveProfile()" class="btn-sm" style="color:var(--accent);height:28px;">保存档案</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>FuXi v1.0 &copy; 2026 瑾岚阁 — <code style="color:var(--accent);">localhost:19528/api/v2</code></footer>
+
+<script>
+const BASE = '/api/v2';
+let apiKey = localStorage.getItem('fuxi_api_key') || '';
+
+function authUrl(url) {
+  if (!apiKey) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(apiKey);
+}
+
+function saveApiKey(val) {
+  apiKey = val.trim();
+  if (apiKey) localStorage.setItem('fuxi_api_key', apiKey);
+  else localStorage.removeItem('fuxi_api_key');
+  refreshAll();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fmt(s, n) { n = n || 120; return s ? s.substring(0, n) + (s.length > n ? '...' : '') : ''; }
+function hlt(text, q) {
+  if (!q) return esc(fmt(text));
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return esc(fmt(text));
+  const before = esc(text.substring(Math.max(0, idx - 30), idx));
+  const match = esc(text.substring(idx, idx + q.length));
+  const after = esc(text.substring(idx + q.length, idx + q.length + 100));
+  return (idx > 30 ? '...' : '') + before + '<span class="hl">' + match + '</span>' + after;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('.tab-btn[onclick*="' + tab + '"]').classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'timeline') loadTimeline();
+  if (tab === 'graph') loadGraph();
+  if (tab === 'engines') refreshEngines();
+  if (tab === 'experiences') loadExperiences();
+}
+
+async function api(path, errorMsg) {
+  try {
+    const r = await fetch(authUrl(BASE + path));
+    const j = await r.json();
+    if (r.status !== 200) throw new Error(j.detail || j.meta?.error || 'HTTP ' + r.status);
+    return j.data;
+  } catch(e) { throw e; }
+}
+
+// ── Stats ──
+async function loadStats() {
+  try {
+    const data = await api('/admin/stats');
+    const items = data.items || 0, edges = data.edges || 0, agents = data.agents || 0;
+    const engTotal = data.engines?.total || '?';
+    const engRunning = data.engines?.running || 0;
+    const ebStats = data.event_bus || {};
+    const scheduler = data.engines?.scheduler; 
+	    const wmStats = data.working_memory || {};
+
+    const autoBadge = engRunning > 0
+      ? '<span style="color:#22c55e;font-size:12px;margin-left:4px">● AUTO</span>'
+      : '<span style="color:#f59e0b;font-size:12px;margin-left:4px">○ MANUAL</span>';
+
+    const attn = scheduler?.active_strategy || '—';
+
+    document.getElementById('stats-row').innerHTML =
+      `<div class="stat-card"><div class="label">记忆数</div><div class="value" style="color:var(--accent)">${items}</div><div class="sub">活跃记忆</div></div>
+       <div class="stat-card"><div class="label">图谱边</div><div class="value" style="color:var(--green)">${edges}</div><div class="sub">关系连接</div></div>
+       <div class="stat-card"><div class="label">引擎</div><div class="value">${engTotal}</div><div class="sub">注册 / ${engRunning}运行${autoBadge}</div></div>
+       <div class="stat-card"><div class="label">注意力</div><div class="value" style="color:var(--purple)">${attn}</div><div class="sub">策略 / 预算${scheduler?.budget || '—'}</div></div>
+       <div class="stat-card"><div class="label">事件</div><div class="value" style="color:var(--cyan)">${ebStats.recent_events || 0}</div><div class="sub">事件总线 (${ebStats.event_types || 0}类型)</div></div>
+       <div class="stat-card"><div class="label">Schema</div><div class="value">${data.schema_version || '—'}</div><div class="sub">数据库版本</div></div>`;
+    return { items, edges };
+  } catch(e) { console.error('Stats:', e); }
+}
+
+// ── Recent ──
+async function refreshRecent() {
+  const el = document.getElementById('recent-list');
+  try {
+    const data = await api('/memories?limit=10');
+    if (!data || !data.length) { el.innerHTML = '<div class="empty">暂无记忆</div>'; return; }
+    el.innerHTML = data.map(m =>
+      `<div class="item"><div class="text">${esc(fmt(m.raw_text || m.text || '', 150))}</div>
+       <div class="meta"><span>📁 ${esc(m.drawer_id||'default')}</span><span>⭐ ${(m.importance||0).toFixed(2)}</span><span>📉 ${(m.decay_score||0).toFixed(2)}</span><span>${(m.created_at||'').substring(0,16)}</span></div></div>`
+    ).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">加载失败</div>'; }
+}
+
+// ── Engine Summary ──
+async function refreshEngineSummary() {
+  const el = document.getElementById('engine-summary');
+  try {
+    const data = await api('/engines');
+    if (!data) { el.innerHTML = '<div class="empty">无法加载</div>'; return; }
+    const running = data.filter(e => e.running).length;
+    el.innerHTML = `<div style="font-size:24px;margin-bottom:8px;"><span style="color:var(--green)">${running}</span> / ${data.length} 运行中</div>`
+      + data.slice(0, 8).map(e => {
+        const dot = e.running ? 'running' : 'stopped';
+        return `<div class="engine-row"><div><span class="status-dot ${dot}"></span><span class="engine-name">${esc(e.name)}</span></div><div class="engine-interval">${e.interval}s</div></div>`;
+      }).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">加载失败</div>'; }
+}
+
+// ── Search ──
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const drawer = document.getElementById('filter-drawer').value;
+  const limit = document.getElementById('filter-limit').value || 20;
+  const minScore = document.getElementById('filter-score').value || 0;
+  const el = document.getElementById('search-results');
+  el.innerHTML = '<div class="loading">搜索中...</div>';
+  try {
+    let url = '/memories/search?q=' + encodeURIComponent(q) + '&limit=' + limit + '&min_score=' + minScore;
+    if (drawer) url += '&drawer_id=' + drawer;
+    const data = await api(url);
+    if (!data || !data.length) { el.innerHTML = '<div class="empty">无匹配结果</div>'; return; }
+    el.innerHTML = data.map(m => {
+      const score = m.score ? `<span style="color:var(--accent)">匹配度: ${m.score.toFixed(2)}</span>` : '';
+      return `<div class="item"><div class="text">${hlt(m.raw_text || '', q)}</div>
+       <div class="meta"><span>📁 ${esc(m.drawer_id||'default')}</span>${score}<span>${(m.created_at||'').substring(0,16)}</span></div></div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">搜索失败</div>'; }
+}
+
+// ── Timeline ──
+async function loadTimeline() {
+  const el = document.getElementById('timeline-container');
+  const drawer = document.getElementById('tl-drawer').value;
+  const limit = document.getElementById('tl-limit').value || 50;
+  el.innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    let path = '/memories?limit=' + limit + '&sort_by=created_at';
+    if (drawer) path += '&drawer_id=' + drawer;
+    const data = await api(path);
+    if (!data || !data.length) { el.innerHTML = '<div class="empty">暂无记忆</div>'; return; }
+    el.innerHTML = data.map(m =>
+      `<div class="timeline-item"><div class="ts">${(m.created_at||'').substring(0,19)}</div>
+       <div class="text">${esc(fmt(m.raw_text||'', 200))}</div>
+       <div class="meta"><span>📁 ${esc(m.drawer_id||'default')}</span><span>⭐ ${(m.importance||0).toFixed(2)}</span></div></div>`
+    ).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">加载失败</div>'; }
+}
+
+// ── Graph ──
+let graphNodes = [], graphEdges = [];
+async function loadGraph() {
+  const drawer = document.getElementById('graph-drawer').value;
+  const limit = parseInt(document.getElementById('graph-limit').value) || 30;
+  try {
+    const data = await api('/memories?limit=' + limit + (drawer ? '&drawer_id=' + drawer : ''));
+    if (!data || !data.length) return;
+    graphNodes = data.map((m, i) => ({
+      id: m.id, label: fmt(m.raw_text || '', 20), x: Math.random() * 600 + 50, y: Math.random() * 300 + 50, drawer: m.drawer_id
+    }));
+    // Fetch real edges from graph API
+    const nodeIds = new Set(graphNodes.map(n => n.id));
+    const edgeData = await api('/graph/edges?limit=1000' + (drawer ? '&drawer_id=' + drawer : ''));
+    const allEdges = (edgeData && edgeData.edges) ? edgeData.edges : [];
+    const idToIdx = {};
+    graphNodes.forEach((n, i) => { idToIdx[n.id] = i; });
+    graphEdges = [];
+    allEdges.forEach(e => {
+      const si = idToIdx[e.source_id], ti = idToIdx[e.target_id];
+      if (si !== undefined && ti !== undefined) {
+        graphEdges.push({ source: si, target: ti, type: e.edge_type || 'related_to' });
+      }
+    });
+    drawGraph();
+    document.getElementById('graph-legend').innerHTML =
+      '<span style="color:var(--accent)">●</span> 记忆节点 &nbsp; ' +
+      '<span style="color:var(--green)">━━</span> 关联边 &nbsp; ' +
+      '拖拽画布移动视角';
+  } catch(e) { console.error('Graph:', e); }
+}
+
+function drawGraph() {
+  const c = document.getElementById('graph-canvas');
+  const rect = c.parentElement.getBoundingClientRect();
+  c.width = rect.width - 32; c.height = 400;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  // Edges
+  ctx.strokeStyle = 'rgba(74,222,128,0.4)'; ctx.lineWidth = 1;
+  graphEdges.forEach(e => {
+    const s = graphNodes[e.source], t = graphNodes[e.target];
+    if (s && t) { ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y); ctx.stroke(); }
+  });
+  // Nodes
+  graphNodes.forEach(n => {
+    ctx.fillStyle = 'rgba(108,143,255,0.9)'; ctx.beginPath();
+    ctx.arc(n.x, n.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'var(--muted)'; ctx.font = '10px sans-serif';
+    ctx.fillText(n.label, n.x + 12, n.y + 4);
+  });
+}
+
+// ── Engines ──
+async function refreshEngines() {
+  const el = document.getElementById('engine-list');
+  try {
+    const data = await api('/engines');
+    if (!data) { el.innerHTML = '<div class="error-msg">加载失败</div>'; return; }
+    el.innerHTML = data.map(e => {
+      const dot = e.running ? 'running' : 'stopped';
+      return `<div class="engine-row">
+        <div><span class="status-dot ${dot}"></span><span class="engine-name">${esc(e.name)}</span></div>
+        <div class="engine-interval">${e.interval}s | 优先级 ${e.priority}</div>
+        <div class="engine-actions">
+          <button class="btn-sm run" onclick="engineAction('${e.name}','start')">▶</button>
+          <button class="btn-sm stop" onclick="engineAction('${e.name}','stop')">■</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">加载失败</div>'; }
+}
+
+async function engineAction(name, action) {
+  try {
+    const r = await fetch(authUrl(BASE + '/engines/' + name + '/control'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action})
+    });
+    if (r.ok) refreshEngines();
+  } catch(e) { console.error('Engine action:', e); }
+}
+
+// ── Experiences ──
+async function loadExperiences() {
+  const el = document.getElementById('experiences-container');
+  const type = document.getElementById('exp-type').value;
+  const limit = document.getElementById('exp-limit').value || 30;
+  el.innerHTML = '<div class="loading">加载中...</div>';
+  try {
+    let path = '/admin/experiences?limit=' + limit;
+    if (type) path += '&task_type=' + type;
+    const data = await api(path);
+    if (!data || !data.experiences || !data.experiences.length) {
+      el.innerHTML = '<div class="empty">暂无经验记录。蒸馏引擎运行后会自动生成。</div>'; return;
+    }
+    el.innerHTML = data.experiences.map(e =>
+      `<div class="exp-card">
+        <div class="exp-type">${esc(e.task_type||'unknown')} · ${esc(e.outcome||'unknown')} · ${(e.created_at||'').substring(0,19)}</div>
+        <div class="exp-desc">${esc(fmt(e.input_desc||'', 200))}</div>
+        ${e.conclusion ? '<div style="font-size:12px;color:var(--muted);margin-top:3px;">结论: ' + esc(fmt(e.conclusion, 150)) + '</div>' : ''}
+      </div>`
+    ).join('');
+  } catch(e) { el.innerHTML = '<div class="error-msg">加载失败</div>'; }
+}
+
+// ── Health ──
+async function checkHealth() {
+  try {
+    const r = await fetch('/health');
+    const badge = document.getElementById('health-badge');
+    badge.innerHTML = r.ok
+      ? '<span style="color:var(--green)">● 系统正常</span>'
+      : '<span style="color:var(--red)">● 异常</span>';
+  } catch(e) {
+    document.getElementById('health-badge').innerHTML = '<span style="color:var(--red)">● 离线</span>';
+  }
+}
+
+// ── Drawer options ──
+async function loadDrawerOptions() {
+  try {
+    const data = await api('/admin/stats');
+    // Simple: just add basic drawers
+    ['<option value="">全部抽屉</option>',
+     '<option value="default">default</option>',
+     '<option value="longterm">longterm</option>'
+    ].forEach(opt => {
+      ['filter-drawer', 'tl-drawer', 'graph-drawer'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.querySelectorAll('option').length <= 1) el.innerHTML += opt;
+      });
+    });
+  } catch(e) {}
+}
+
+// ── Task tracking ──
+async function refreshTasks() {
+  const el = document.getElementById('task-panel');
+  try {
+    const data = await api('/tasks/stats/summary');
+    const s = data.data || data;
+    const total = s.total || 0;
+    const by = s.by_status || {};
+
+    // Status badges
+    const badges = {
+      PENDING: '⏳', RUNNING: '🔄', DONE: '✅', FAILED: '❌', BLOCKED: '🚫'
+    };
+    const colors = {
+      PENDING: '#f59e0b', RUNNING: '#3b82f6', DONE: '#22c55e', FAILED: '#ef4444', BLOCKED: '#8b5cf6'
+    };
+
+    if (total === 0) {
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;">暂无任务</div>';
+      return;
+    }
+
+    let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">';
+    for (const [status, count] of Object.entries(by)) {
+      html += `<div style="background:var(--bg);border-radius:6px;padding:8px 16px;text-align:center;flex:1;min-width:80px;">
+        <div style="font-size:20px;">${badges[status]||'❓'}</div>
+        <div style="font-size:18px;font-weight:700;color:${colors[status]||'#6b7280'};">${count}</div>
+        <div style="font-size:11px;color:var(--muted);">${status}</div>
+      </div>`;
+    }
+    html += '</div>';
+
+    // Recent tasks
+    const tasks = await api('/tasks?limit=10');
+    const list = (tasks.data && tasks.data.tasks) ? tasks.data.tasks : [];
+    if (list.length > 0) {
+      html += '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+      html += '<tr style="color:var(--muted);text-align:left;"><th>标题</th><th>执行人</th><th>状态</th><th>进度</th></tr>';
+      for (const t of list) {
+        html += `<tr style="border-top:1px solid var(--border);">
+          <td style="padding:6px 4px;">${escHtml(t.title||'?')}</td>
+          <td>${escHtml(t.assignee||'')}</td>
+          <td><span style="color:${colors[t.status]||'#6b7280'};">${badges[t.status]||''} ${t.status||'?'}</span></td>
+          <td>${Math.round((t.progress||0)*100)}%</td>
+        </tr>`;
+      }
+      html += '</table>';
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);text-align:center;">任务面板加载失败</div>';
+  }
+}
+
+// ── Model Routes ──
+async function refreshRoutes() {
+  const el = document.getElementById('routes-panel');
+  try {
+    const data = await api('/models/routes');
+    const routes = (data && data.routes) || [];
+    if (!routes.length) { el.innerHTML = '<div style="color:var(--muted);padding:10px;">暂无路由规则</div>'; return; }
+    el.innerHTML = routes.map(r => {
+      const types = (r.task_types||[]).join(', ') || '-';
+      const agents = (r.agent_ids||[]).join(', ') || '-';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:13px;">
+        <div>
+          <span style="font-weight:600;">${esc(r.rule_name||r.rule_id)}</span>
+          <span style="color:var(--muted);margin-left:8px;">→ ${esc(r.model_name)}</span>
+          <br><span style="font-size:11px;color:var(--muted);">任务: ${esc(types)} | Agent: ${esc(agents)} | 优先级: ${r.priority}</span>
+        </div>
+        <button onclick="deleteRoute('${esc(r.rule_id)}')" style="color:var(--red);font-size:11px;background:none;border:none;cursor:pointer;">删除</button>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);padding:10px;">加载失败</div>'; }
+}
+
+async function addRoute() {
+  const rule_id = document.getElementById('new-rule-id').value.trim();
+  const rule_name = document.getElementById('new-rule-name').value.trim();
+  const task_types = document.getElementById('new-rule-tasks').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const agent_ids = document.getElementById('new-rule-agents').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const model_name = document.getElementById('new-rule-model').value.trim();
+  const priority = parseInt(document.getElementById('new-rule-priority').value) || 0;
+  if (!rule_id || !rule_name) return alert('规则ID和名称不能为空');
+  try {
+    await fetch(authUrl(BASE + '/models/routes'), {
+      method:'POST', headers:{'Content-Type':'application/json','X-API-Key':apiKey},
+      body:JSON.stringify({rule_id, rule_name, task_types, agent_ids, model_name, priority})
+    });
+    refreshRoutes();
+  } catch(e) { alert('添加失败: ' + e); }
+}
+
+async function deleteRoute(rule_id) {
+  if (!confirm('删除规则 ' + rule_id + '?')) return;
+  try {
+    await fetch(authUrl(BASE + '/models/routes/' + rule_id), {
+      method:'DELETE', headers:{'X-API-Key':apiKey}
+    });
+    refreshRoutes();
+  } catch(e) { alert('删除失败: ' + e); }
+}
+
+// ── User Profile ──
+async function refreshProfile() {
+  try {
+    const data = await api('/profile');
+    if (!data) return;
+    const prefs = data.preferences || {};
+    const habits = data.habits || [];
+    const taboos = data.taboos || [];
+    document.getElementById('profile-prefs').innerHTML =
+      '<table style="font-size:12px;">' +
+      Object.entries(prefs).map(([k,v]) => `<tr><td style="color:var(--muted);padding:4px 8px;">${esc(k)}</td><td>${esc(String(v))}</td></tr>`).join('') +
+      '</table>';
+    document.getElementById('profile-habits').innerHTML =
+      '<div style="font-size:12px;margin-bottom:8px;"><b>习惯</b>: ' + (habits.length ? habits.map(h=>'<span style="background:var(--accent);color:#000;padding:2px 6px;border-radius:8px;margin:2px;font-size:11px;">'+esc(h)+'</span>').join('') : '<span style="color:var(--muted);">无</span>') + '</div>' +
+      '<div style="font-size:12px;"><b>禁忌</b>: ' + (taboos.length ? taboos.map(t=>'<span style="background:var(--red);color:#fff;padding:2px 6px;border-radius:8px;margin:2px;font-size:11px;">'+esc(t)+'</span>').join('') : '<span style="color:var(--muted);">无</span>') + '</div>';
+    document.getElementById('edit-prefs').value = JSON.stringify(prefs, null, 2);
+    document.getElementById('edit-habits').value = JSON.stringify(habits);
+    document.getElementById('edit-taboos').value = JSON.stringify(taboos);
+  } catch(e) { console.error('Profile:', e); }
+}
+
+async function saveProfile() {
+  try {
+    const prefs = JSON.parse(document.getElementById('edit-prefs').value || '{}');
+    const habits = JSON.parse(document.getElementById('edit-habits').value || '[]');
+    const taboos = JSON.parse(document.getElementById('edit-taboos').value || '[]');
+    await fetch(authUrl(BASE + '/profile'), {
+      method:'PUT', headers:{'Content-Type':'application/json','X-API-Key':apiKey},
+      body:JSON.stringify({preferences:prefs, habits:habits, taboos:taboos})
+    });
+    refreshProfile();
+  } catch(e) { alert('保存失败: ' + e); }
+}
+
+function refreshAll() {
+  loadStats().then(() => {
+    refreshRecent(); refreshEngineSummary(); refreshTasks();
+  });
+}
+
+// Init
+if (apiKey) document.getElementById('api-key-input').value = apiKey;
+refreshAll(); checkHealth(); loadDrawerOptions();
+</script>
+</body>
+</html>
