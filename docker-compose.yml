@@ -1,0 +1,42 @@
+version: 3.8
+
+services:
+  fuxi:
+    build: .
+    container_name: fuxi-v1
+    restart: unless-stopped
+    ports:
+      - 19528:19528
+    environment:
+      - FUXI_API_KEY=
+      - FUXI_HOST=0.0.0.0
+      - FUXI_PORT=19528
+      - FUXI_BASE=/data
+      - FUXI_LOG_LEVEL=INFO
+      - FUXI_LOG_FORMAT=json
+      - SILICONFLOW_KEY=
+      - OPENCLAW_GATEWAY=http://127.0.0.1:18789
+      - FUXI_DB_POOL_MAX=3
+      - FUXI_DB_POOL_TIMEOUT=5
+      - FUXI_EMBED_CACHE_MAX=32
+      - FUXI_EMBED_DIM=384
+      - FUXI_WM_CAPACITY=7
+      - FUXI_SELF_HEAL_RETRIES=3
+      - FUXI_BACKUP_MAX=10
+    volumes:
+      - fuxi_data:/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:19528/health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+
+volumes:
+  fuxi_data:
