@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+env.example
+*.env
+*.pem
+*.key
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db.tar.gz
+
+# Archives
+*.tar.gz
+*.zip
+*.tgz
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local state (sensitive)
+.openclaw/
+.jinlange_ingestion_state.json
+CLAUDE.md
+.fuxi/
