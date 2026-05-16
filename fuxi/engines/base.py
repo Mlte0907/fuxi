@@ -1,4 +1,5 @@
 """伏羲 v1.0 — 认知引擎基类 + 注册表"""
+import json
 import logging
 import threading
 import time
@@ -104,6 +105,8 @@ class CognitiveEngine(ABC):
     def _execute(self) -> dict:
         """带错误统计的执行包装"""
         from fuxi.kernel.event_bus import EventPriority
+        from fuxi.store.connection import get_pool
+        from datetime import datetime
         t0 = time.time()
         try:
             result = self.run()
@@ -116,6 +119,21 @@ class CognitiveEngine(ABC):
                 priority=EventPriority.LOW,
                 source=f"engine:{self.name}",
             ))
+            # 持久化 run_count 和 last_run 到 engine_states
+            pool = get_pool()
+            with pool.connection() as c:
+                state_json = json.dumps({
+                    "running": self._state.running,
+                    "last_run": self._state.last_run,
+                    "run_count": self._state.run_count,
+                    "error_count": self._state.error_count,
+                    "metadata": self._state.metadata,
+                }, ensure_ascii=False)
+                c.execute(
+                    "INSERT OR REPLACE INTO engine_states (engine_name, state_json, updated_at) "
+                    "VALUES (?,?,?)",
+                    (self.name, state_json, datetime.now().isoformat())
+                )
             return result
         except Exception as e:
             self._state.error_count += 1

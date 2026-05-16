@@ -113,13 +113,7 @@ class CognitiveLoop(CognitiveEngine):
             "timestamp": datetime.now().isoformat(),
         }
 
-        # 更新引擎状态
-        with pool.connection() as c:
-            c.execute(
-                "INSERT OR REPLACE INTO engine_states (engine_name, state_json, updated_at) "
-                "VALUES (?,?,?)",
-                ("cognitive_loop", json.dumps(state, ensure_ascii=False), datetime.now().isoformat())
-            )
-
+        # 注意：不要在这里保存 engine_states，_execute() 会在 run() 返回后更新
+        # run_count 和 last_run 由 _execute() 管理
         self._state.metadata["last_loop"] = state
         return state
