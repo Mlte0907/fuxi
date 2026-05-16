@@ -29,6 +29,16 @@ OPENCLAW_SKILLS_DIR = Path.home() / ".openclaw" / "skills"
 INSTINCT_THRESHOLD = 0.55  # 本能生成阈值
 SKILL_THRESHOLD = 0.75     # 技能晋升阈值
 
+# 技能状态机（来自 Hermes Curator）
+STATE_ACTIVE = "active"
+STATE_STALE = "stale"      # 30天无使用
+STATE_ARCHIVED = "archived" # 90天无使用
+STALE_DAYS = 30
+ARCHIVE_DAYS = 90
+
+# 技能使用记录目录
+SKILL_USAGE_DIR = Path.home() / ".claude" / "skills" / ".usage"
+
 
 @register_engine("skill_evolution", experimental=True)
 class SkillEvolutionEngine(CognitiveEngine):
@@ -68,8 +78,11 @@ class SkillEvolutionEngine(CognitiveEngine):
         # 4. 晋升检查：检查是否有技能可以晋升
         promoted = self._check_promotions()
 
-        # 5. 发布进化事件
-        self._publish_evolution_event(obs_processed, instincts_generated, clusters_updated, promoted)
+        # 5. 状态检查：active → stale → archived
+        state_transitions = self._check_skill_state_transitions()
+
+        # 6. 发布进化事件
+        self._publish_evolution_event(obs_processed, instincts_generated, clusters_updated, promoted, state_transitions)
 
         return {
             "action": "completed",
@@ -77,6 +90,7 @@ class SkillEvolutionEngine(CognitiveEngine):
             "instincts_generated": instincts_generated,
             "clusters_updated": clusters_updated,
             "skills_promoted": promoted,
+            "state_transitions": state_transitions,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -351,7 +365,84 @@ version: 1.0.0
             "openclaw_skills_dir": str(OPENCLAW_SKILLS_DIR),
         }
 
-    def _publish_evolution_event(self, obs, instincts, clusters, promoted):
+    def _track_skill_usage(self, skill_id: str, action: str):
+        """追踪技能使用，更新状态"""
+        SKILL_USAGE_DIR.mkdir(parents=True, exist_ok=True)
+        usage_file = SKILL_USAGE_DIR / f"{skill_id}.json"
+        try:
+            usage = json.loads(usage_file.read_text()) if usage_file.exists() else {
+                "skill_id": skill_id,
+                "use_count": 0,
+                "view_count": 0,
+                "patch_count": 0,
+                "last_used_at": None,
+                "last_viewed_at": None,
+                "state": STATE_ACTIVE,
+                "created_by": "skill-evolution-engine",
+            }
+        except Exception:
+            usage = {"skill_id": skill_id, "state": STATE_ACTIVE}
+
+        usage["last_activity"] = datetime.now().isoformat()
+        if action == "use":
+            usage["use_count"] = usage.get("use_count", 0) + 1
+            usage["last_used_at"] = datetime.now().isoformat()
+            usage["state"] = STATE_ACTIVE  # 使用重置为 active
+        elif action == "view":
+            usage["view_count"] = usage.get("view_count", 0) + 1
+            usage["last_viewed_at"] = datetime.now().isoformat()
+        elif action == "patch":
+            usage["patch_count"] = usage.get("patch_count", 0) + 1
+
+        usage_file.write_text(json.dumps(usage, ensure_ascii=False, indent=2))
+        logger.debug(f"Skill usage tracked: {skill_id} {action}")
+
+    def _check_skill_state_transitions(self) -> dict:
+        """检查技能状态转换（active → stale → archived）"""
+        if not SKILL_USAGE_DIR.exists():
+            return {"checked": 0, "staled": 0, "archived": 0}
+
+        now = datetime.now()
+        checked = staled = archived = 0
+
+        for usage_file in SKILL_USAGE_DIR.glob("*.json"):
+            try:
+                usage = json.loads(usage_file.read_text())
+                checked += 1
+
+                state = usage.get("state", STATE_ACTIVE)
+                last_used = usage.get("last_used_at")
+
+                if state == STATE_ARCHIVED:
+                    continue  # 已归档，跳过
+
+                if not last_used:
+                    continue
+
+                # 解析最后使用时间
+                last_used_dt = datetime.fromisoformat(last_used)
+                days_idle = (now - last_used_dt).days
+
+                if state == STATE_ACTIVE and days_idle >= STALE_DAYS:
+                    usage["state"] = STATE_STALE
+                    usage_file.write_text(json.dumps(usage, ensure_ascii=False, indent=2))
+                    staled += 1
+                    logger.info(f"Skill staled: {usage_file.stem}")
+                elif state == STATE_STALE and days_idle >= ARCHIVE_DAYS:
+                    # 归档而不是删除
+                    archive_dir = SKILL_USAGE_DIR / ".archive"
+                    archive_dir.mkdir(exist_ok=True)
+                    archive_file = archive_dir / usage_file.name
+                    usage_file.rename(archive_file)
+                    archived += 1
+                    logger.info(f"Skill archived: {usage_file.stem}")
+
+            except Exception as e:
+                logger.debug(f"State transition check failed: {e}")
+
+        return {"checked": checked, "staled": staled, "archived": archived}
+
+    def _publish_evolution_event(self, obs, instincts, clusters, promoted, state_transitions=None):
         from fuxi.kernel.event_bus import Event, EventPriority, get_event_bus
         get_event_bus().publish(Event(
             type="skill_evolution.cycle",
@@ -360,6 +451,7 @@ version: 1.0.0
                 "instincts_generated": instincts,
                 "clusters_updated": clusters,
                 "skills_promoted": promoted,
+                "state_transitions": state_transitions or {},
             },
             priority=EventPriority.LOW,
             source="engine:skill_evolution",
