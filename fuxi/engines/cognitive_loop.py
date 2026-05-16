@@ -102,6 +102,9 @@ class CognitiveLoop(CognitiveEngine):
                         results[name] = {"status": "error", "error": str(e)}
 
         state = {
+            "running": self._state.running,
+            "last_run": self._state.last_run,
+            "run_count": self._state.run_count,
             "engines_triggered": len(results),
             "results": results,
             "attention": attention.stats,
