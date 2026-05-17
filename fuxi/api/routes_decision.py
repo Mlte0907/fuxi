@@ -106,7 +106,7 @@ async def get_decision_advice(
     from fuxi.store.connection import get_pool
     from datetime import datetime
 
-    pool = get_pool()
+    logger.warning(f"[UNIQUE_MARKER_168161] Decision advice endpoint hit, task={task}")
 
     # 1. 查询相关决策经验
     decision_rows = pool.fetchall(
