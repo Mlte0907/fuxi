@@ -94,3 +94,78 @@ async def list_experiences(
             "created_at": row["created_at"],
         })
     return ApiResponse.ok({"experiences": experiences, "total": len(experiences)})
+
+
+@router.get("/decisions/advice")
+async def get_decision_advice(
+    task: str = Query(..., description="任务描述"),
+    context: str = Query("", description="额外上下文"),
+):
+    """基于记忆系统获取决策建议（供 Hook 调用）"""
+    import json
+    from fuxi.store.connection import get_pool
+    from datetime import datetime
+
+    pool = get_pool()
+
+    # 1. 查询相关决策经验
+    decision_rows = pool.fetchall(
+        "SELECT event_data, created_at FROM event_log "
+        "WHERE event_type='decision' AND created_at > datetime('now', '-30 days') "
+        "ORDER BY created_at DESC LIMIT 20"
+    )
+
+    # 2. 查询相关技能进化记录
+    skill_rows = pool.fetchall(
+        "SELECT raw_text, importance, tags, created_at FROM items "
+        "WHERE drawer_id IN ('instincts', 'skills') AND archived=0 "
+        "AND created_at > datetime('now', '-30 days') "
+        "ORDER BY importance DESC LIMIT 10"
+    )
+
+    # 3. 构造建议
+    suggestions = []
+    keywords = task.lower().split()
+
+    for row in decision_rows:
+        data = json.loads(row["event_data"]) if isinstance(row["event_data"], str) else row["event_data"]
+        decision_text = data.get("decision", "") or data.get("description", "")
+        if any(kw in decision_text.lower() for kw in keywords if len(kw) > 3):
+            suggestions.append({
+                "type": "decision",
+                "source": data.get("source", "unknown"),
+                "advice": decision_text[:200],
+                "outcome": data.get("outcome", "unknown"),
+                "date": row["created_at"],
+            })
+
+    for row in skill_rows:
+        tags = json.loads(row["tags"]) if isinstance(row["tags"], str) else row.get("tags", [])
+        text_lower = row["raw_text"].lower()
+        if any(kw in text_lower for kw in keywords if len(kw) > 3):
+            suggestions.append({
+                "type": "skill",
+                "source": row["raw_text"][:50],
+                "advice": row["raw_text"][:200],
+                "confidence": row["importance"],
+                "tags": tags,
+                "date": row["created_at"],
+            })
+
+    # 4. 去重并限制数量
+    seen = set()
+    unique = []
+    for s in suggestions:
+        key = s["advice"][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(s)
+    unique = unique[:5]
+
+    return ApiResponse.ok({
+        "task": task,
+        "context": context,
+        "suggestions": unique,
+        "count": len(unique),
+        "timestamp": datetime.now().isoformat(),
+    })
