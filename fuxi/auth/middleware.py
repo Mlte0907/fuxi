@@ -66,6 +66,7 @@ PATH_PERMISSION_MAP = {
     "GET /api/v2/decisions": Permission.READ,
     "POST /api/v2/decisions/evaluate": Permission.ADMIN,
     "GET /api/v2/decisions/experiences": Permission.READ,
+    "GET /api/v2/decisions/advice": Permission.READ,
 }
 
 
