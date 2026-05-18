@@ -18,6 +18,8 @@ _graph = MemoryGraph()
 
 async def _require_write(request: Request):
     """验证写权限"""
+    if not config.api_key:
+        raise HTTPException(status_code=401, detail="API key not configured")
     api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
     if api_key != config.api_key:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")

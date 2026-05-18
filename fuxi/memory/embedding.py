@@ -1,4 +1,5 @@
 """伏羲 v1.0 嵌入服务（API为主 + 本地fallback）"""
+import asyncio
 import hashlib
 import logging
 import threading
@@ -70,33 +71,35 @@ class EmbeddingService:
             from fuxi.privacy.sanitizer import MemorySanitizer
             safe_text = MemorySanitizer.sanitize_for_embedding(text)
 
-            import httpx
-            data = {"model": config.embed_api_model, "input": safe_text, "encoding_format": "float"}
-            with httpx.Client(timeout=10) as client:
-                resp = client.post(
-                    config.embed_api_url,
-                    json=data,
-                    headers={"Authorization": f"Bearer {config.siliconflow_key}"},
-                )
-                resp.raise_for_status()
-                result = resp.json()
-                vec = result["data"][0]["embedding"]
-                self._fail_count = 0
-                if self._circuit_open:
-                    # Half-open probe succeeded — close the circuit
-                    self._circuit_open = False
-                    self._half_open_until = 0
-                    logger.info("Circuit breaker CLOSED — API recovered")
-                else:
-                    self._circuit_open = False
-                return vec
+            # Use aiohttp for async HTTP to avoid GIL blocking during I/O
+            async def _fetch():
+                import aiohttp
+                data = {"model": config.embed_api_model, "input": safe_text, "encoding_format": "float"}
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        config.embed_api_url,
+                        json=data,
+                        headers={"Authorization": f"Bearer {config.siliconflow_key}"},
+                    ) as resp:
+                        resp.raise_for_status()
+                        result = await resp.json()
+                        return result["data"][0]["embedding"]
+
+            vec = asyncio.run(_fetch())
+            self._fail_count = 0
+            if self._circuit_open:
+                self._circuit_open = False
+                self._half_open_until = 0
+                logger.info("Circuit breaker CLOSED — API recovered")
+            return vec
         except Exception as e:
             self._fail_count += 1
             self._last_fail_time = time.time()
             logger.warning(f"Embed API failed ({self._fail_count}): {e}")
             if self._fail_count >= config.embed_fail_threshold:
                 self._circuit_open = True
-                self._half_open_until = time.time() + 60  # retry probe after 60s
+                self._half_open_until = time.time() + 60
                 logger.warning("Circuit breaker OPEN — using local fallback, half-open in 60s")
             return None
 

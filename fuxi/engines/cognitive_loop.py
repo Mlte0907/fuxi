@@ -121,3 +121,17 @@ class CognitiveLoop(CognitiveEngine):
         # run_count 和 last_run 由 _execute() 管理
         self._state.metadata["last_loop"] = state
         return state
+
+    def _check_health(self) -> dict:
+        """健康检查：检测 cognitive_loop 是否卡住或超时未调度"""
+        now = time.time()
+        last_run = self._state.last_run
+        idle = now - last_run if last_run > 0 else 0
+        health = {
+            "name": self.name,
+            "running": self._state.running,
+            "last_run": last_run,
+            "idle_seconds": round(idle),
+            "stale": idle > self.interval * 3 if last_run > 0 else False,
+        }
+        return health

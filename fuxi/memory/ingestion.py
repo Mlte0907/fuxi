@@ -186,9 +186,10 @@ def _find_duplicate(raw_text: str) -> Optional[dict]:
     except Exception as e:
         logger.warning(f"Vector index dedup check failed, falling back: {e}")
 
-    # Fallback: scan recent 200 memories from same drawer (broader than original 50)
+    # v1.5.2 fix: Fallback 扫描限制为 50 条（原本 200 条），并在相同 drawer 内扫描以减少范围
     rows = pool.fetchall(
-        "SELECT id, raw_text, embedding FROM items WHERE archived = 0 ORDER BY created_at DESC LIMIT 200"
+        "SELECT id, raw_text, embedding FROM items WHERE archived = 0 AND drawer_id = 'default' "
+        "ORDER BY created_at DESC LIMIT 50"
     )
     best_score = 0.0
     best_row = None

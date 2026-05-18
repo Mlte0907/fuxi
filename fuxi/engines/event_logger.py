@@ -7,11 +7,13 @@
   - 由 cognitive_loop 定期调度（默认每 1 分钟）
   - 读取事件总线最近事件，写入 event_log 表
 """
+import json
 import logging
 from datetime import datetime
 
 from fuxi.engines.base import CognitiveEngine, register_engine
 from fuxi.kernel.event_bus import Event, EventPriority, get_event_bus
+from fuxi.privacy.sanitizer import MemorySanitizer
 
 logger = logging.getLogger("fuxi.engine.event_logger")
 
@@ -51,17 +53,34 @@ class EventLoggerEngine(CognitiveEngine):
                         if event.priority.value < EventPriority.HIGH.value:
                             continue
 
+                    # 对事件数据进行脱敏处理，防止敏感信息泄露
+                    event_data_raw = event.data
+                    if isinstance(event_data_raw, dict):
+                        # 对 dict 中的字符串值进行脱敏
+                        def _sanitize_value(v):
+                            if isinstance(v, str):
+                                clean, _ = MemorySanitizer.sanitize(v, level="standard")
+                                return clean
+                            elif isinstance(v, dict):
+                                return {k: _sanitize_value(vk) for k, vk in v.items()}
+                            elif isinstance(v, list):
+                                return [_sanitize_value(item) for item in v]
+                            return v
+                        event_data_raw = _sanitize_value(event_data_raw)
+                    elif isinstance(event_data_raw, str):
+                        clean, _ = MemorySanitizer.sanitize(event_data_raw, level="standard")
+                        event_data_raw = clean
+
                     event_data = {
                         "type": event.type,
-                        "data": event.data,
+                        "data": event_data_raw,
                         "source": event.source,
                         "priority": event.priority.name,
                     }
 
-                    import json
                     conn.execute(
                         "INSERT INTO event_log (event_type, event_data, source, created_at) VALUES (?, ?, ?, ?)",
-                        (event.type, json.dumps(event.data, ensure_ascii=False), event.source, datetime.now().isoformat())
+                        (event.type, json.dumps(event_data, ensure_ascii=False), event.source, datetime.now().isoformat())
                     )
                     logged_count += 1
 

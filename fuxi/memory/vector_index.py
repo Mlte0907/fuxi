@@ -125,12 +125,14 @@ class VectorIndex:
         return results
 
     def _search_brute(self, query: np.ndarray, top_k: int) -> List[Tuple[str, float]]:
-        """暴力搜索 — 对非索引后端，每次搜索都需加载所有向量"""
+        """暴力搜索 — 限制加载最多 1000 条向量，避免全表扫描"""
         from fuxi.store.connection import get_pool
 
         pool = get_pool()
+        # v1.5.2 fix: 限制加载条数，按最新优先，降低内存占用
         rows = pool.fetchall(
-            "SELECT id, embedding FROM items WHERE embedding IS NOT NULL AND archived=0"
+            "SELECT id, embedding FROM items WHERE embedding IS NOT NULL AND archived=0 "
+            "ORDER BY created_at DESC LIMIT 1000"
         )
         if not rows:
             return []

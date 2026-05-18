@@ -17,7 +17,10 @@ ENGINE_TIERS = {
         "creative", "narrative", "proactive", "resonance", "prediction", "decision", "persona",
         "adaptive", "reconsolidation", "reflection", "nudge", "curiosity", "openclaw_memory",
         "skill_evolution", "feishu_kb", "emotion_orchestrator", "world_model",
-        "skill_orchestrator", "arch_auditor", "knowledge_miner"
+        "skill_orchestrator", "arch_auditor", "knowledge_miner",
+        "parallel_scheduler", "streaming_index", "lifecycle_manager", "multi_tenant",
+        "export_migration", "multimodal_memory", "synthesis", "intent_prediction",
+        "deep_emotion", "cognitive_bias", "meta_evolution"
     ],
     "all": None  # None means all engines
 }
@@ -66,6 +69,17 @@ from fuxi.engines.causal import CausalEngine
 from fuxi.engines.feishu_kb import FeishuKnowledgeBaseEngine
 from fuxi.engines.knowledge_miner import KnowledgeMiner
 from fuxi.engines.event_logger import EventLoggerEngine
+from fuxi.engines.parallel_scheduler import ParallelSchedulerEngine
+from fuxi.engines.streaming_index import StreamingIndexEngine
+from fuxi.engines.lifecycle_manager import LifecycleManagerEngine
+from fuxi.engines.multi_tenant import MultiTenantEngine
+from fuxi.engines.export_migration import ExportMigrationEngine
+from fuxi.engines.multimodal_memory import MultimodalMemoryEngine
+from fuxi.engines.synthesis import SynthesisEngine
+from fuxi.engines.intent_prediction import IntentPredictionEngine
+from fuxi.engines.deep_emotion import DeepEmotionEngine
+from fuxi.engines.cognitive_bias import CognitiveBiasEngine
+from fuxi.engines.meta_evolution import MetaEvolutionEngine
 
 # Import this module to trigger register_engine() at startup
 _ = OpenClawMemoryEngine
@@ -81,3 +95,14 @@ _ = SkillOrchestrator
 _ = ArchAuditor
 _ = KnowledgeMiner
 _ = EventLoggerEngine
+_ = ParallelSchedulerEngine
+_ = StreamingIndexEngine
+_ = LifecycleManagerEngine
+_ = MultiTenantEngine
+_ = ExportMigrationEngine
+_ = MultimodalMemoryEngine
+_ = SynthesisEngine
+_ = IntentPredictionEngine
+_ = DeepEmotionEngine
+_ = CognitiveBiasEngine
+_ = MetaEvolutionEngine

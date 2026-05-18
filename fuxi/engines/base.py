@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
@@ -268,7 +269,9 @@ class EngineRegistry:
             engine.stop()
         logger.info(f"Stopped {len(self._engines)} engines")
 
-    def run_all(self, include_experimental: bool = False, tier: str | None = None) -> Dict[str, dict]:
+    def run_all(self, include_experimental: bool = False, tier: str | None = None,
+                max_workers: int = 8) -> Dict[str, dict]:
+        """并行执行所有引擎（按优先级排序），使用 ThreadPoolExecutor"""
         results = {}
         from fuxi.engines import get_enabled_engines
         tier_filter = get_enabled_engines() if tier is None else None
@@ -276,14 +279,27 @@ class EngineRegistry:
             self._engines.items(),
             key=lambda x: x[1].priority, reverse=True
         )
+        # Filter engines to run
+        runnable = []
         for name, engine in engines:
             if tier_filter is not None and name not in tier_filter:
                 continue
             if include_experimental or not engine.experimental:
-                try:
-                    results[name] = engine._execute()
-                except Exception as e:
-                    results[name] = {"error": str(e)}
+                runnable.append((name, engine))
+
+        def execute_one(item):
+            name, engine = item
+            try:
+                return name, engine._execute()
+            except Exception as e:
+                return name, {"error": str(e)}
+
+        # Use ThreadPoolExecutor for parallel execution
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(runnable))) as ex:
+            futures = {ex.submit(execute_one, item): item for item in runnable}
+            for future in as_completed(futures):
+                name, result = future.result()
+                results[name] = result
         return results
 
     @property

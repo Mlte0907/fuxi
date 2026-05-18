@@ -164,6 +164,17 @@ class MetacognitionEngine(CognitiveEngine):
                         tokens=15,
                     ))
 
+            # 检查 cognitive_loop 是否卡住（单点故障检测）
+            if name == "cognitive_loop" and health.get("running"):
+                idle = time.time() - last_run if last_run > 0 else 0
+                if idle > 600:  # 超过10分钟未调度视为严重告警
+                    alerts.append({
+                        "engine": name,
+                        "issue": "single_point_of_failure",
+                        "idle_seconds": round(idle),
+                        "severity": "CRITICAL",
+                    })
+
         # 全局系统健康
         immune = get_engine_registry().get("immune")
         immune_issues = immune._state.metadata.get("last_patrol", {}).get("issues", []) if immune else []

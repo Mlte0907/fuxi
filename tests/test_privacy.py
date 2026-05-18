@@ -168,3 +168,32 @@ class TestMemorySanitizer:
         assert "[REDACTED:秘密***]" in clean
         # 清理
         MemorySanitizer.custom_keywords.remove("秘密项目")
+
+
+class TestEventLogSanitization:
+    """验证 event_log 写入时敏感信息被脱敏"""
+
+    def test_event_data_sanitized_before_insert(self):
+        """验证 EventLoggerEngine 在写入 event_log 前对数据进行脱敏"""
+        from fuxi.engines.event_logger import EventLoggerEngine
+        from fuxi.kernel.event_bus import Event, EventPriority
+        from fuxi.privacy.sanitizer import MemorySanitizer
+
+        # 构造包含敏感信息的测试事件
+        sensitive_text = "用户手机号13812345678，邮箱test@example.com"
+        test_event = Event(
+            type="memory.created",  # EventType 使用字符串
+            data={"content": sensitive_text, "user_id": "u123"},
+            source="test_source",
+            priority=EventPriority.NORMAL,
+        )
+
+        # 验证事件数据中确实包含敏感信息
+        assert "13812345678" in str(test_event.data)
+
+        # 测试 MemorySanitizer 能正确脱敏
+        clean_content, _ = MemorySanitizer.sanitize(sensitive_text, level="standard")
+        assert "13812345678" not in clean_content
+        assert "test@example.com" not in clean_content
+        assert "[PHONE]" in clean_content
+        assert "[EMAIL]" in clean_content

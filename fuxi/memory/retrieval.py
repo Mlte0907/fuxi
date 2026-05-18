@@ -29,8 +29,8 @@ def recall(query: Optional[str] = None, drawer_id: Optional[str] = None, limit: 
 
     cache_key = None
     if use_cache and query:
-        # BUG-005 fix: include min_importance in cache key
-        cache_key = _make_cache_key(query, drawer_id, limit, offset, agent_id, sort_by, min_importance)
+        # v1.5.2 fix: include vector_weight in cache key to avoid cache pollution
+        cache_key = _make_cache_key(query, drawer_id, limit, offset, agent_id, sort_by, min_importance, vector_weight)
         with _cache_lock:
             if cache_key in _recall_cache:
                 entry = _recall_cache[cache_key]
