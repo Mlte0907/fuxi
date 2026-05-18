@@ -21,6 +21,26 @@ logger = logging.getLogger("fuxi.api.memories")
 router = APIRouter(tags=["memories"])
 
 
+# 允许读取的 drawer 映射（agent_id -> 可读 drawer 列表，None 表示无限制）
+_DRAWER_READ_PERMISSIONS = {
+    "main": None,  # main 可读所有
+    "xuanwu": None,
+    "qinglong": ["default", "qinglong_view", "longterm"],
+    "baihu": ["default", "baihu_tasks", "longterm"],
+    "zhuque": ["default", "zhuque_reports", "longterm"],
+    "fuxi": None,
+    "anonymous": ["default"],  # 未认证只能读 default
+}
+
+
+def _check_drawer_read_permission(agent_id: str, drawer_id: str) -> bool:
+    """检查 agent 是否有权读取指定 drawer"""
+    if agent_id in _DRAWER_READ_PERMISSIONS and _DRAWER_READ_PERMISSIONS[agent_id] is None:
+        return True  # 无限制可读
+    allowed = _DRAWER_READ_PERMISSIONS.get(agent_id, ["default"])
+    return drawer_id in allowed or drawer_id == "default"
+
+
 class RememberRequest(BaseModel):
     text: Optional[str] = Field(None, min_length=1, max_length=50000)
     raw_text: Optional[str] = Field(None, min_length=1, max_length=50000)
@@ -88,8 +108,15 @@ async def create_memory(req: RememberRequest, request: Request):
 async def list_memories(
     query: Optional[str] = None, drawer_id: Optional[str] = None, limit: int = 10,
     offset: int = 0, agent_id: Optional[str] = None, min_importance: float = 0.0,
-    sort_by: str = "relevance"
+    sort_by: str = "relevance", request: Request = None
 ):
+    # Drawer 级别权限：检查 agent 是否有权访问该 drawer
+    calling_agent = request.headers.get("X-Agent-ID", agent_id or "anonymous") if request else agent_id or "anonymous"
+    if drawer_id and not _check_drawer_read_permission(calling_agent, drawer_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Agent '{calling_agent}' cannot read from drawer '{drawer_id}'"
+        )
     return ApiResponse.ok(recall(query=query, drawer_id=drawer_id, limit=limit,
                                 offset=offset, agent_id=agent_id,
                                 min_importance=min_importance, sort_by=sort_by))
@@ -100,8 +127,14 @@ async def list_memories(
 async def search_memories(
     q: str = Query(..., min_length=1), drawer_id: Optional[str] = None,
     limit: int = 20, offset: int = 0, agent_id: Optional[str] = None,
-    tags: Optional[str] = None, min_score: float = 0.0
+    tags: Optional[str] = None, min_score: float = 0.0, request: Request = None
 ):
+    calling_agent = request.headers.get("X-Agent-ID", agent_id or "anonymous") if request else agent_id or "anonymous"
+    if drawer_id and not _check_drawer_read_permission(calling_agent, drawer_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Agent '{calling_agent}' cannot search in drawer '{drawer_id}'"
+        )
     tag_list = tags.split(",") if tags else None
     # Publish search signal for BehaviorCollector (BUG-002 fix)
     get_event_bus().publish(Event(
@@ -273,7 +306,14 @@ async def export_memories(
     drawer_id: Optional[str] = None,
     format: str = "json",
     limit: int = 10000,
+    request: Request = None
 ):
+    calling_agent = request.headers.get("X-Agent-ID", "anonymous") if request else "anonymous"
+    if drawer_id and not _check_drawer_read_permission(calling_agent, drawer_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Agent '{calling_agent}' cannot export from drawer '{drawer_id}'"
+        )
     pool = get_pool()
     if drawer_id:
         rows = pool.fetchall(
