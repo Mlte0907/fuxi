@@ -143,7 +143,8 @@ class MetacognitionEngine(CognitiveEngine):
                         logger.warning(f"Metacognition restart of {name} failed: {e}")
 
             # 检查最后运行时间
-            if health["last_run"] > 0:
+            last_run = health.get("last_run", 0)
+            if last_run > 0:
                 idle = time.time() - health["last_run"]
                 eng = get_engine_registry().get(name)
                 if eng is not None and idle > eng.interval * 3:
