@@ -71,13 +71,7 @@ class CognitiveLoop(CognitiveEngine):
             except Exception:
                 pass
 
-        # 按优先级排序引擎（注意力 FOCUS 模式时只运行高优先级引擎）
-        engines = sorted(
-            get_engine_registry().engines.items(),
-            key=lambda x: x[1].priority, reverse=True
-        )
-        min_priority = 7 if attention.active_strategy == AttentionStrategy.FOCUS else 0
-
+        # ── 引擎调度 ──
         from fuxi.engines import get_enabled_engines
         enabled = get_enabled_engines()
         for name, engine in engines:
@@ -88,9 +82,13 @@ class CognitiveLoop(CognitiveEngine):
             if engine.priority < min_priority:
                 continue
 
-            # EXPLORE 模式下偶尔运行实验引擎
-            if engine.experimental and (attention.active_strategy != AttentionStrategy.EXPLORE or not attention.allocate(10)):
-                continue
+            # 实验性引擎：interval > 0 表示已配置，应参与调度
+            # 实验性引擎如果未启动，自动启动（防止数据库恢复后一直停止）
+            if engine.experimental:
+                if engine.interval == 0:
+                    continue  # interval=0 表示禁用
+                if not engine._state.running:
+                    engine.start()  # 自动启动未运行的实验性引擎
 
             last_run = engine._state.last_run
             if (last_run == 0 or (now - last_run) >= engine.interval) and engine._state.running and attention.allocate(3):

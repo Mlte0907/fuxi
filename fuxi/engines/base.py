@@ -34,6 +34,8 @@ class CognitiveEngine(ABC):
         self._state.metadata["_pending_events"] = []
         self._lock = threading.Lock()
         self._setup_subscriptions()
+        # 从数据库恢复引擎状态（如果存在）
+        self._restore_state()
 
     def _setup_subscriptions(self):
         """子类覆写以注册事件订阅。返回 {event_type: handler} 字典。"""
@@ -101,6 +103,30 @@ class CognitiveEngine(ABC):
     def resume(self):
         self._state.metadata.pop("_paused", None)
         logger.info(f"Engine [{self.name}] resumed")
+
+    def _restore_state(self):
+        """从数据库恢复引擎状态，确保重启后引擎状态一致"""
+        try:
+            from fuxi.store.connection import get_pool
+            pool = get_pool()
+            row = pool.fetchone(
+                "SELECT state_json FROM engine_states WHERE engine_name=?",
+                (self.name,)
+            )
+            if row:
+                state = json.loads(row["state_json"])
+                self._state.running = state.get("running", False)
+                self._state.last_run = state.get("last_run", 0.0)
+                self._state.run_count = state.get("run_count", 0)
+                self._state.error_count = state.get("error_count", 0)
+                if "metadata" in state:
+                    # 合并 metadata，保留 pending_events
+                    for k, v in state["metadata"].items():
+                        if k != "_pending_events":
+                            self._state.metadata[k] = v
+                logger.info(f"[{self.name}] state restored: running={self._state.running}, run_count={self._state.run_count}")
+        except Exception as e:
+            logger.warning(f"[{self.name}] failed to restore state: {e}")
 
     def _execute(self) -> dict:
         """带错误统计的执行包装"""

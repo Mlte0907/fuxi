@@ -43,11 +43,12 @@ class MetacognitionEngine(CognitiveEngine):
         alerts = []
         actions_taken = []
         for name, health in engine_health.items():
-            if health["error_count"] > 5:
+            error_count = health.get("error_count", 0)
+            if error_count > 5:
                 alerts.append({
                     "engine": name,
                     "issue": "high_error_rate",
-                    "error_count": health["error_count"],
+                    "error_count": error_count,
                 })
                 # 自动重启高错误率引擎
                 eng = get_engine_registry().get(name)
@@ -55,8 +56,8 @@ class MetacognitionEngine(CognitiveEngine):
                     try:
                         eng.stop()
                         eng.start()
-                        actions_taken.append({"engine": name, "action": "restart", "reason": f"error_count={health['error_count']}"})
-                        logger.warning(f"Metacognition: auto-restarted {name} (error_count={health['error_count']})")
+                        actions_taken.append({"engine": name, "action": "restart", "reason": f"error_count={error_count}"})
+                        logger.warning(f"Metacognition: auto-restarted {name} (error_count={error_count})")
                     except Exception as e:
                         logger.warning(f"Metacognition restart of {name} failed: {e}")
 

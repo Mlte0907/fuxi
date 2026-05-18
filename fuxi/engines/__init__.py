@@ -64,6 +64,7 @@ from fuxi.engines.feishu_im import FeishuIMEngine
 from fuxi.engines.causal import CausalEngine
 from fuxi.engines.feishu_kb import FeishuKnowledgeBaseEngine
 from fuxi.engines.knowledge_miner import KnowledgeMiner
+from fuxi.engines.event_logger import EventLoggerEngine
 
 # Import this module to trigger register_engine() at startup
 _ = OpenClawMemoryEngine
@@ -78,3 +79,4 @@ _ = PredictiveWorldModel
 _ = SkillOrchestrator
 _ = ArchAuditor
 _ = KnowledgeMiner
+_ = EventLoggerEngine
