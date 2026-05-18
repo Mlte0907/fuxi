@@ -137,8 +137,8 @@ class KnowledgeMiner(CognitiveEngine):
 
     name = "knowledge_miner"
     experimental = True
-    priority = 8
-    interval = 3600
+    priority = 4     # 提高优先级
+    interval = 1800  # 30分钟
 
     def __init__(self):
         super().__init__()
@@ -146,10 +146,10 @@ class KnowledgeMiner(CognitiveEngine):
         self._last_count = 0
         # category_name → wiki node_token（预先填充分类节点）
         self._category_nodes: dict[str, str] = {
-            "系统事件": "G75iw0hz9iWaFykXjyuceduvncd",
-            "工作记录": "NjnJwVBsPixgO5kZITXccXWpnOi",
-            "技术笔记": "X4vewtnKEiYqMbkew0Cc3obBnxb",
-            "生活记录": "AxVFwO0e8iD2IvkMn2Wcg0Lmn2c",
+            "系统事件": "DCr1w344ei1f85kRKsZcujiznKh",
+            "工作记录": "FSjswuN9ZiuVo6kgwLEckJoYnDc",
+            "技术笔记": "Z0UqwR3lriEScUkwLeScWvCnn6c",
+            "生活记录": "CqVYwklt3i4puhktJmscoiBzng6",
         }
 
     def health_check(self) -> dict:

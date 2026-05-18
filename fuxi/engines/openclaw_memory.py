@@ -5,12 +5,9 @@
 """
 import json
 import logging
-import os
 import re
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fuxi.engines.base import CognitiveEngine, register_engine
 from fuxi.memory.ingestion import remember
@@ -25,8 +22,8 @@ DEDUP_SIMILARITY_THRESHOLD = 0.92  # 伏羲记忆去重阈值
 class OpenClawMemoryEngine(CognitiveEngine):
     name = "openclaw_memory"
     experimental = True
-    interval = 3600  # 每小时同步一次
-    priority = 6
+    interval = 600   # 每10分钟同步一次
+    priority = 4     # 提高优先级，确保被调度
 
     def _get_subscriptions(self):
         return {

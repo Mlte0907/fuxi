@@ -46,8 +46,8 @@ class SkillEvolutionEngine(CognitiveEngine):
 
     name = "skill_evolution"
     experimental = True
-    interval = 600  # 每10分钟检查一次
-    priority = 7
+    interval = 300  # 每5分钟检查一次
+    priority = 4    # 提高优先级
 
     def _get_subscriptions(self):
         return {

@@ -1,5 +1,4 @@
 """伏羲 v1.0 — CognitiveLoop 认知循环"""
-import json
 import logging
 import time
 from datetime import datetime
@@ -11,13 +10,13 @@ from fuxi.store.connection import get_pool
 logger = logging.getLogger("fuxi.engine.loop")
 
 
-@register_engine("cognitive_loop", experimental=True)
+@register_engine("cognitive_loop", experimental=False)
 class CognitiveLoop(CognitiveEngine):
     """认知循环 — 按优先级调度所有引擎执行，受注意力系统调控"""
     name = "cognitive_loop"
     priority = 1  # 最低优先级（自身调度器）
     interval = 180
-    experimental = True
+    experimental = False
 
     def run(self) -> dict:
         pool = get_pool()

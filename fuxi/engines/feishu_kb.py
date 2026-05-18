@@ -50,7 +50,8 @@ class FeishuKnowledgeBaseEngine(CognitiveEngine):
 
     name = "feishu_kb"
     experimental = True
-    interval = 0
+    interval = 1800   # 每30分钟自动运行
+    priority = 4     # 提高优先级
 
     def __init__(self):
         super().__init__()
@@ -73,7 +74,9 @@ class FeishuKnowledgeBaseEngine(CognitiveEngine):
             logger.error(f"[feishu_kb] search failed: {result.get('error')}")
             return []
         docs = []
-        for r in result.get("data", {}).get("results", []):
+        # lark-cli 返回结构: result.data.data.results
+        inner_data = result.get("data", {}).get("data", {})
+        for r in inner_data.get("results", []):
             meta = r.get("result_meta", {})
             docs.append({
                 "title": r.get("title_highlighted", "").replace("<h>", "").replace("</h>", ""),
