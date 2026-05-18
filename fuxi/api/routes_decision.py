@@ -96,32 +96,72 @@ async def list_experiences(
     return ApiResponse.ok({"experiences": experiences, "total": len(experiences)})
 
 
-@router.get("/decisions/advice-v3")
-async def get_decision_advice_v3(
+@router.get("/decisions/advice")
+async def get_decision_advice(
     task: str = Query(..., description="任务描述"),
+    context: str = Query("", description="额外上下文"),
 ):
-    """基于记忆系统获取决策建议 v3（供 Hook 调用）"""
-    from datetime import datetime
-    logger.warning(f"[ADVICE_V3] called with task={task}")
-    return ApiResponse.ok({
-        "task": task,
-        "version": "v3",
-        "UNIQUE_V3_MARKER": True,
-        "count": 0,
-        "timestamp": datetime.now().isoformat(),
-    })
-async def get_decision_advice_v2(
-    task: str = Query(..., description="任务描述"),
-):
-    """基于记忆系统获取决策建议 v2（供 Hook 调用）"""
-    from datetime import datetime
+    """基于记忆系统获取决策建议（供 Hook 调用）"""
+    import json
     from fuxi.store.connection import get_pool
-    logger.warning(f"[ADVICE_V2] called with task={task}")
+    from datetime import datetime
+
     pool = get_pool()
+
+    decision_rows = pool.fetchall(
+        "SELECT event_data, created_at FROM event_log "
+        "WHERE event_type='decision' AND created_at > datetime('now', '-30 days') "
+        "ORDER BY created_at DESC LIMIT 20"
+    )
+
+    skill_rows = pool.fetchall(
+        "SELECT raw_text, importance, tags, created_at FROM items "
+        "WHERE drawer_id IN ('instincts', 'skills') AND archived=0 "
+        "AND created_at > datetime('now', '-30 days') "
+        "ORDER BY importance DESC LIMIT 10"
+    )
+
+    suggestions = []
+    keywords = task.lower().split()
+
+    for row in decision_rows:
+        data = json.loads(row["event_data"]) if isinstance(row["event_data"], str) else row["event_data"]
+        decision_text = data.get("decision", "") or data.get("description", "")
+        if any(kw in decision_text.lower() for kw in keywords if len(kw) > 3):
+            suggestions.append({
+                "type": "decision",
+                "source": data.get("source", "unknown"),
+                "advice": decision_text[:200],
+                "outcome": data.get("outcome", "unknown"),
+                "date": row["created_at"],
+            })
+
+    for row in skill_rows:
+        tags = json.loads(row["tags"]) if isinstance(row["tags"], str) else row.get("tags", [])
+        text_lower = row["raw_text"].lower()
+        if any(kw in text_lower for kw in keywords if len(kw) > 3):
+            suggestions.append({
+                "type": "skill",
+                "source": row["raw_text"][:50],
+                "advice": row["raw_text"][:200],
+                "confidence": row["importance"],
+                "tags": tags,
+                "date": row["created_at"],
+            })
+
+    seen = set()
+    unique = []
+    for s in suggestions:
+        key = s["advice"][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(s)
+    unique = unique[:5]
+
     return ApiResponse.ok({
         "task": task,
-        "version": "v2",
-        "count": 0,
-        "UNIQUE_BODY_MARKER": "ADVICE_V2_EXECUTION_12345",
+        "context": context,
+        "suggestions": unique,
+        "count": len(unique),
         "timestamp": datetime.now().isoformat(),
     })
