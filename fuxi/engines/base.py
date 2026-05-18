@@ -130,12 +130,17 @@ class CognitiveEngine(ABC):
 
     def _execute(self) -> dict:
         """带错误统计的执行包装"""
+        import asyncio
+        import inspect
         from fuxi.kernel.event_bus import EventPriority
         from fuxi.store.connection import get_pool
         from datetime import datetime
         t0 = time.time()
         try:
-            result = self.run()
+            if inspect.iscoroutinefunction(self.run):
+                result = asyncio.run(self.run())
+            else:
+                result = self.run()
             elapsed_ms = round((time.time() - t0) * 1000)
             self._state.last_run = time.time()
             self._state.run_count += 1

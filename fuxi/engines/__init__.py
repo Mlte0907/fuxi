@@ -8,7 +8,8 @@ ENGINE_TIERS = {
     ],
     "standard": [
         "cognitive_loop", "decay", "perception", "soul", "metacognition", "safety",
-        "dialogue", "jinlange_ingestion", "reasoning", "distill", "dream", "immune", "emotion"
+        "dialogue", "jinlange_ingestion", "reasoning", "distill", "dream", "immune", "emotion",
+        "event_logger"
     ],
     "advanced": [
         "cognitive_loop", "decay", "perception", "soul", "metacognition", "safety",

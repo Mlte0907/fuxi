@@ -74,17 +74,28 @@ class CognitiveLoop(CognitiveEngine):
         # ── 引擎调度 ──
         from fuxi.engines import get_enabled_engines
         enabled = get_enabled_engines()
-        for name, engine in engines:
+        all_engines = sorted(
+            get_engine_registry().engines.items(),
+            key=lambda x: x[1].priority, reverse=True
+        )
+        min_priority = 7 if attention.active_strategy == AttentionStrategy.FOCUS else 0
+
+        for name, engine in all_engines:
             if name == "cognitive_loop":
                 continue
-            if enabled is not None and name not in enabled:
-                continue
-            if engine.priority < min_priority:
-                continue
-
-            # 实验性引擎：interval > 0 表示已配置，应参与调度
+            # 实验性引擎：interval > 0 表示已配置，可参与调度（不受enabled限制）
             # 实验性引擎如果未启动，自动启动（防止数据库恢复后一直停止）
             if engine.experimental:
+                if engine.interval == 0:
+                    continue  # interval=0 表示禁用
+                if not engine._state.running:
+                    engine.start()  # 自动启动未运行的实验性引擎
+            else:
+                # 非实验性引擎受enabled限制
+                if enabled is not None and name not in enabled:
+                    continue
+            if engine.priority < min_priority:
+                continue
                 if engine.interval == 0:
                     continue  # interval=0 表示禁用
                 if not engine._state.running:

@@ -1,8 +1,11 @@
-"""伏羲 v1.5 — MetacognitionEngine 元认知（基础元学习框架）"""
+"""伏羲 v1.5 — MetacognitionEngine 元认知（基础元学习框架）
+
+系统级长期监测伏羲记忆系统运行状态和引擎情况。
+"""
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fuxi.engines.base import CognitiveEngine, get_engine_registry, register_engine
 from fuxi.kernel.event_bus import Event, EventPriority, get_event_bus
@@ -10,13 +13,12 @@ from fuxi.store.connection import get_pool
 
 logger = logging.getLogger("fuxi.engine.metacognition")
 
-# v1.5: 学习速率和元学习参数
-META_LEARN_WINDOW = 100  # 学习窗口大小
+META_LEARN_WINDOW = 100
 
 
 @register_engine("metacognition", experimental=False)
 class MetacognitionEngine(CognitiveEngine):
-    """元认知 v1.5 — 元学习 + 自重构 + 策略自适应"""
+    """元认知 v1.5 — 元学习 + 自重构 + 策略自适应 + 系统级长期监测"""
     name = "metacognition"
     priority = 4
     interval = 300
@@ -25,8 +27,87 @@ class MetacognitionEngine(CognitiveEngine):
     def _get_subscriptions(self):
         return {"engine.executed": self._on_event, "decision.executed": self._on_event}
 
+    # ── 系统级长期监测 ──
+    def _monitor_system_health(self, pool) -> dict:
+        """长期监测伏羲记忆系统和引擎运行状态"""
+        now = time.time()
+        health_report = {
+            "timestamp": datetime.now().isoformat(),
+            "engines": {},
+            "memory": {},
+            "event_log": {},
+            "recommendations": [],
+        }
+
+        # 引擎健康检测
+        engine_stats = {"total": 0, "running": 0, "stale": 0, "error": 0}
+        for name, engine in get_engine_registry().engines.items():
+            health = engine.health_check()
+            engine_stats["total"] += 1
+            if health.get("running"):
+                engine_stats["running"] += 1
+            if health.get("error_count", 0) > 0:
+                engine_stats["error"] += 1
+            if health.get("last_run", 0) > 0:
+                idle = now - health["last_run"]
+                if idle > engine.interval * 3:
+                    engine_stats["stale"] += 1
+
+        health_report["engines"] = engine_stats
+
+        # 记忆系统健康检测
+        try:
+            mem_stats = pool.fetchone(
+                "SELECT COUNT(*) as total, SUM(CASE WHEN archived=0 THEN 1 ELSE 0 END) as active FROM items"
+            )
+            drawer_stats = pool.fetchall(
+                "SELECT drawer_id, COUNT(*) as cnt FROM items GROUP BY drawer_id"
+            )
+            recent_count = pool.fetchone(
+                "SELECT COUNT(*) as cnt FROM items WHERE created_at > datetime('now', '-1 hour')"
+            )
+            health_report["memory"] = {
+                "total": mem_stats["total"] if mem_stats else 0,
+                "active": mem_stats["active"] if mem_stats else 0,
+                "drawers": {r["drawer_id"]: r["cnt"] for r in drawer_stats} if drawer_stats else {},
+                "last_hour_new": recent_count["cnt"] if recent_count else 0,
+            }
+        except Exception as e:
+            health_report["memory"] = {"error": str(e)}
+
+        # 事件日志活性检测
+        try:
+            event_stats = pool.fetchone(
+                "SELECT COUNT(*) as cnt FROM event_log WHERE created_at > datetime('now', '-1 hour')"
+            )
+            health_report["event_log"] = {
+                "last_hour_events": event_stats["cnt"] if event_stats else 0,
+            }
+        except Exception as e:
+            health_report["event_log"] = {"error": str(e)}
+
+        # 生成建议
+        if engine_stats["stale"] > 3:
+            health_report["recommendations"].append(
+                f"引擎过期数量过多({engine_stats['stale']}), 检查调度器"
+            )
+        if engine_stats["error"] > 0:
+            health_report["recommendations"].append(
+                f"存在{engine_stats['error']}个引擎错误, 需要人工检查"
+            )
+        if health_report["memory"].get("last_hour_new", 0) == 0:
+            health_report["recommendations"].append(
+                "过去1小时无新记忆摄入, 检查采集引擎是否正常"
+            )
+
+        self._state.metadata["last_health_report"] = health_report
+        return health_report
+
     def run(self) -> dict:
         pool = get_pool()
+
+        # ── 系统级长期监测 ──
+        system_health = self._monitor_system_health(pool)
 
         # v1.5: 元学习 — 分析引擎执行模式并自适应调整
         meta_learn = self._meta_learn(pool)
@@ -94,6 +175,7 @@ class MetacognitionEngine(CognitiveEngine):
             "overall": "degraded" if alerts else "healthy",
             "meta_learn": meta_learn,
             "self_reconfig": self_reconfig,
+            "system_health": system_health,
             "v": "3.0",
             "timestamp": datetime.now().isoformat(),
         }
