@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fuxi.config import config
 from fuxi.engines.base import CognitiveEngine, register_engine
-from fuxi.memory.search import _cosine_sim
+from fuxi.memory.search import cosine_similarity
 from fuxi.store.connection import get_pool
 
 logger = logging.getLogger("fuxi.engine.dream")
@@ -96,7 +96,7 @@ class DreamConsolidation(CognitiveEngine):
                     continue
                 pre_score = 0.0
                 if items[i]["id"] in emb_map and items[j]["id"] in emb_map:
-                    pre_score = _cosine_sim(emb_map[items[i]["id"]], emb_map[items[j]["id"]])
+                    pre_score = cosine_similarity(emb_map[items[i]["id"]], emb_map[items[j]["id"]])
                 if pre_score > 0.5:
                     candidates.append((j, pre_score))
             candidates.sort(key=lambda x: x[1], reverse=True)
@@ -151,7 +151,7 @@ class DreamConsolidation(CognitiveEngine):
                         continue
                     seen.add(pair)
                     i, j = pair
-                    cos_sim = _cosine_sim(emb_map[items[i]["id"]], emb_map[items[j]["id"]])
+                    cos_sim = cosine_similarity(emb_map[items[i]["id"]], emb_map[items[j]["id"]])
                     if cos_sim >= 0.3:
                         candidate_pairs.append(pair)
 

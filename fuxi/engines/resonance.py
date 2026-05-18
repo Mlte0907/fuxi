@@ -30,14 +30,14 @@ class ResonanceEngine(CognitiveEngine):
 
         matches = []
         if len(emotional) >= 2:
-            from fuxi.memory.search import _cosine_sim
+            from fuxi.memory.search import cosine_similarity
 
             for i in range(len(emotional)):
                 for j in range(i + 1, len(emotional)):
                     try:
                         vec_i = json.loads(emotional[i]["embedding"])
                         vec_j = json.loads(emotional[j]["embedding"])
-                        sim = _cosine_sim(vec_i, vec_j)
+                        sim = cosine_similarity(vec_i, vec_j)
 
                         # 情感共鸣：向量相似 且 情感值同向
                         same_sign = emotional[i]["emotion_valence"] * emotional[j]["emotion_valence"] > 0

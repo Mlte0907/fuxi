@@ -25,13 +25,6 @@ class RememberRequest(BaseModel):
     text: Optional[str] = Field(None, min_length=1, max_length=50000)
     raw_text: Optional[str] = Field(None, min_length=1, max_length=50000)
     drawer_id: str = "default"
-
-    @property
-    def effective_text(self) -> str:
-        t = self.text or self.raw_text
-        if not t:
-            raise ValueError("text or raw_text is required")
-        return t
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
     tags: List[str] = []
     source: str = "direct"
@@ -40,6 +33,13 @@ class RememberRequest(BaseModel):
     facts: str = ""
     collaborators: List[str] = []
     emotion_valence: float = Field(default=0.0, ge=-1.0, le=1.0)
+
+    @property
+    def effective_text(self) -> str:
+        t = self.text or self.raw_text
+        if not t:
+            raise ValueError("text or raw_text is required")
+        return t
 
 
 class UpdateMemoryRequest(BaseModel):

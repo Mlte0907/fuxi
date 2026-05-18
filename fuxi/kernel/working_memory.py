@@ -1,9 +1,12 @@
 """伏羲 v1.0 工作记忆（Miller定律7槽位 + 注意力衰减）"""
+import logging
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("fuxi.kernel.working_memory")
 
 from fuxi.config import config
 from fuxi.kernel.event_bus import get_event_bus

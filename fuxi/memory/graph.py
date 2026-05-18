@@ -250,7 +250,7 @@ class MemoryGraph:
             return {"status": "skip", "reason": "not enough valid embeddings", "found": 0}
 
         # 简单聚类: 按 drawer 分组 + 向量余弦相似度
-        from fuxi.memory.search import _cosine_sim
+        from fuxi.memory.search import cosine_similarity
         candidates = []
 
         # 对每对检查相似度（同drawer优先）
@@ -259,7 +259,7 @@ class MemoryGraph:
                 if items[i]["drawer_id"] == items[j]["drawer_id"]:
                     continue  # 同一抽屉可能有 explicit relation，跳过
                 try:
-                    sim = _cosine_sim(embeddings[i], embeddings[j])
+                    sim = cosine_similarity(embeddings[i], embeddings[j])
                     if sim >= similarity_threshold:
                         candidates.append({
                             "source_id": items[i]["id"],

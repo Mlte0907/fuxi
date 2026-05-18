@@ -7,7 +7,7 @@ from typing import Optional
 
 from fuxi.config import config
 from fuxi.memory.embedding import get_embedding_service
-from fuxi.memory.search import _cosine_sim
+from fuxi.memory.search import cosine_similarity
 from fuxi.store.connection import get_pool
 
 logger = logging.getLogger("fuxi.memory.ingestion")
@@ -174,7 +174,7 @@ def _find_duplicate(raw_text: str) -> Optional[dict]:
                         continue
                     try:
                         stored_vec = json.loads(r["embedding"])
-                        score = _cosine_sim(query_vec, stored_vec)
+                        score = cosine_similarity(query_vec, stored_vec)
                         if score > 0.92 and score > best_score:
                             best_score = score
                             best_row = dict(r)
@@ -197,7 +197,7 @@ def _find_duplicate(raw_text: str) -> Optional[dict]:
             continue
         try:
             stored_vec = json.loads(r["embedding"])
-            score = _cosine_sim(query_vec, stored_vec)
+            score = cosine_similarity(query_vec, stored_vec)
             if score > 0.92 and score > best_score:
                 best_score = score
                 best_row = dict(r)

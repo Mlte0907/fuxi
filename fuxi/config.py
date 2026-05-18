@@ -55,7 +55,7 @@ class Config(BaseSettings):
     recall_cache_max: int = 16
     vector_weight_default: float = 0.6
     fts_weight_default: float = 4.0
-    similarity_threshold: float = 0.5  # 向量搜索结果的最低余弦相似度
+    similarity_threshold: float = 0.35  # 向量搜索结果的最低余弦相似度 (与 params.py PARAM_BOUNDS 一致)
 
     # 衰减
     decay_base: float = 0.95

@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from fuxi.config import config
 from fuxi.memory.embedding import get_embedding_service
-from fuxi.memory.search import _cosine_sim
+from fuxi.memory.search import cosine_similarity
 from fuxi.store.connection import get_pool
 
 logger = logging.getLogger("fuxi.memory.retrieval")
@@ -74,7 +74,7 @@ def recall(query: Optional[str] = None, drawer_id: Optional[str] = None, limit: 
             def _vec_similarity(row):
                 try:
                     vec = json.loads(row["embedding"])
-                    return _cosine_sim(vec, query_vec)
+                    return cosine_similarity(vec, query_vec)
                 except Exception:
                     return 0.0
             rows_sorted = sorted(rows, key=lambda r: _vec_similarity(r) * vector_weight + r["importance"] * (1 - vector_weight), reverse=True)

@@ -91,9 +91,9 @@ def create_app() -> FastAPI:
         logger.info("FuXi v1.0 stopped")
 
     app = FastAPI(
-        title="FuXi v1.1",
+        title="FuXi v1.5.1",
         description="FuXi - Unified Memory & Cognitive Engine System",
-        version="1.1.0",
+        version="1.5.1",
         lifespan=lifespan
     )
 

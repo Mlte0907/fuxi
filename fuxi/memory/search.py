@@ -1,6 +1,7 @@
 """伏羲 v1.0 — 混合搜索（FTS5+向量+RRF+自适应权重）"""
 import json
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fuxi.config import config
@@ -159,7 +160,7 @@ def _brute_force_vec_search(pool, query_vec, limit, vec_results):
         for r in vec_rows:
             try:
                 vec = json.loads(r["embedding"])
-                sim = _cosine_sim(query_vec, vec)
+                sim = cosine_similarity(query_vec, vec)
                 if sim > 0.25:
                     scores.append((r["rowid"], sim))
                     if sim > 0.6:
@@ -201,7 +202,7 @@ def _compute_method(fts: dict, vec: dict, fused: dict) -> str:
     return "empty"
 
 
-def _cosine_sim(a: list, b: list) -> float:
+def cosine_similarity(a: list, b: list) -> float:
     dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = sum(x * x for x in a) ** 0.5
     norm_b = sum(x * x for x in b) ** 0.5

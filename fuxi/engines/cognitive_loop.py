@@ -96,10 +96,6 @@ class CognitiveLoop(CognitiveEngine):
                     continue
             if engine.priority < min_priority:
                 continue
-                if engine.interval == 0:
-                    continue  # interval=0 表示禁用
-                if not engine._state.running:
-                    engine.start()  # 自动启动未运行的实验性引擎
 
             last_run = engine._state.last_run
             if (last_run == 0 or (now - last_run) >= engine.interval) and engine._state.running and attention.allocate(3):
